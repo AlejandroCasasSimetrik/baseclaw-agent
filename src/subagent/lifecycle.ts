@@ -14,7 +14,7 @@
 
 import { v4 as uuidv4 } from "uuid";
 import { traceable } from "langsmith/traceable";
-import { ChatOpenAI } from "@langchain/openai";
+import { getModel } from "../models/factory.js";
 import { AIMessage, SystemMessage, HumanMessage } from "@langchain/core/messages";
 import { createWorkingMemory } from "../memory/working-memory.js";
 import { MemoryManager } from "../memory/manager.js";
@@ -71,19 +71,17 @@ const SUB_AGENT_PROMPTS: Record<SpawnableAgentType, string> = {
     reviewer: `You are a Sub-Reviewer Agent. You have been spawned to perform a focused review on a specific aspect (e.g., code quality, security, performance). Provide structured, scored feedback with specific recommendations.`,
 };
 
-// ── LLM ──────────────────────────────────────────────────
+// ── LLM (uses centralized model factory) ─────────────────
 
-function getSubAgentModel(agentType: SpawnableAgentType): ChatOpenAI {
-    const temperatureMap: Record<SpawnableAgentType, number> = {
-        ideation: 0.7,
-        planning: 0.2,
-        execution: 0.1,
-        reviewer: 0.1,
+function getSubAgentModel(agentType: SpawnableAgentType) {
+    // Map sub-agent types to factory model roles
+    const roleMap: Record<SpawnableAgentType, "ideation" | "planning" | "execution" | "reviewer"> = {
+        ideation: "ideation",
+        planning: "planning",
+        execution: "execution",
+        reviewer: "reviewer",
     };
-    return new ChatOpenAI({
-        model: "gpt-4o-mini",
-        temperature: temperatureMap[agentType],
-    });
+    return getModel(roleMap[agentType]);
 }
 
 // ── Spawn ────────────────────────────────────────────────

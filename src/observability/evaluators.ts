@@ -9,7 +9,7 @@
  *   - Heuristic: uses programmatic rules to score
  */
 
-import { ChatOpenAI } from "@langchain/openai";
+import { getModel } from "../models/factory.js";
 import { SystemMessage, HumanMessage } from "@langchain/core/messages";
 
 // ── Types ───────────────────────────────────────────────────
@@ -26,15 +26,11 @@ export interface EvaluatorInput {
     referenceOutputs?: Record<string, unknown>;
 }
 
-// ── LLM-as-Judge Evaluators ─────────────────────────────────
+// ── LLM-as-Judge Evaluators (uses centralized model factory) ───
 
-/** Lazy LLM initialization for evaluators */
-let _evalModel: ChatOpenAI | null = null;
-function getEvalModel(): ChatOpenAI {
-    if (!_evalModel) {
-        _evalModel = new ChatOpenAI({ model: "gpt-4o-mini", temperature: 0 });
-    }
-    return _evalModel;
+/** Get the evaluator model from the centralized factory */
+function getEvalModel() {
+    return getModel("scorer");
 }
 
 /**

@@ -14,24 +14,12 @@
  */
 
 import { traceable } from "langsmith/traceable";
-import { ChatOpenAI } from "@langchain/openai";
+import { getModel } from "../models/factory.js";
 import { SystemMessage, HumanMessage } from "@langchain/core/messages";
 import type { CheckpointRequest, CheckpointResponse, CheckpointVerdict } from "./types.js";
 import { getReviewConfig } from "./types.js";
 
-// ── LLM ──────────────────────────────────────────────────
-
-let _checkpointModel: ChatOpenAI | null = null;
-
-function getCheckpointModel(): ChatOpenAI {
-    if (!_checkpointModel) {
-        _checkpointModel = new ChatOpenAI({
-            model: "gpt-4o-mini",
-            temperature: 0.1,
-        });
-    }
-    return _checkpointModel;
-}
+// ── LLM (uses centralized model factory) ─────────────────
 
 // ── Checkpoint Prompt ────────────────────────────────────
 
@@ -67,7 +55,7 @@ RESPOND WITH VALID JSON ONLY. No markdown, no code fences:
  */
 export const checkpointWithReviewer = traceable(
     async (request: CheckpointRequest): Promise<CheckpointResponse> => {
-        const model = getCheckpointModel();
+        const model = getModel("scorer");
 
         const concerns =
             request.concerns.length > 0

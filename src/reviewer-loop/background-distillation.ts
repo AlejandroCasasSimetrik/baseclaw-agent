@@ -14,24 +14,12 @@
  */
 
 import { traceable } from "langsmith/traceable";
-import { ChatOpenAI } from "@langchain/openai";
+import { getModel } from "../models/factory.js";
 import { SystemMessage, HumanMessage } from "@langchain/core/messages";
 import { MemoryManager } from "../memory/manager.js";
 import type { DistilledKnowledge, KnowledgeType } from "./types.js";
 
-// ── LLM ──────────────────────────────────────────────────
-
-let _bgDistillModel: ChatOpenAI | null = null;
-
-function getBgDistillModel(): ChatOpenAI {
-    if (!_bgDistillModel) {
-        _bgDistillModel = new ChatOpenAI({
-            model: "gpt-4o-mini",
-            temperature: 0.2,
-        });
-    }
-    return _bgDistillModel;
-}
+// ── LLM (uses centralized model factory) ─────────────────
 
 // ── Background Distillation Prompt ───────────────────────
 
@@ -76,7 +64,7 @@ export const runBackgroundDistillation = traceable(
         episodeLimit: number = 50
     ): Promise<DistilledKnowledge[]> => {
         const mm = new MemoryManager(tenantId);
-        const model = getBgDistillModel();
+        const model = getModel("feedback");
 
         // Fetch recent episodes
         let episodes: any[];

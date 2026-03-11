@@ -18,25 +18,13 @@
  */
 
 import { traceable } from "langsmith/traceable";
-import { ChatOpenAI } from "@langchain/openai";
+import { getModel } from "../models/factory.js";
 import { SystemMessage, HumanMessage } from "@langchain/core/messages";
 import { MemoryManager } from "../memory/manager.js";
 import type { QualityAssessment, DistilledKnowledge, KnowledgeType } from "./types.js";
 import type { AgentType } from "../skills/types.js";
 
-// ── LLM ──────────────────────────────────────────────────
-
-let _distillModel: ChatOpenAI | null = null;
-
-function getDistillModel(): ChatOpenAI {
-    if (!_distillModel) {
-        _distillModel = new ChatOpenAI({
-            model: "gpt-4o-mini",
-            temperature: 0.3,
-        });
-    }
-    return _distillModel;
-}
+// ── LLM (uses centralized model factory) ─────────────────
 
 // ── Distillation Prompt ──────────────────────────────────
 
@@ -83,7 +71,7 @@ export const distillKnowledge = traceable(
         taskContext: string,
         tenantId: string
     ): Promise<DistilledKnowledge | null> => {
-        const model = getDistillModel();
+        const model = getModel("feedback");
 
         const dimensionSummary = assessment.dimensions
             .map((d) => `${d.dimension}: ${d.score}/100`)

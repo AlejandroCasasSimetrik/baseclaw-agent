@@ -32,10 +32,16 @@ export const embedChunks = traceable(
         if (chunks.length === 0) return [];
 
         const { OpenAIEmbeddings } = await import("@langchain/openai");
-        // Use OPENAI_EMBEDDING_KEY if available (separate from main OPENAI_API_KEY
-        // which may point to a non-OpenAI provider like Cerebras)
+        // Use OPENAI_EMBEDDING_KEY for real OpenAI embeddings.
+        // Must also override baseURL because OPENAI_BASE_URL is set to Cerebras.
         const apiKey = process.env.OPENAI_EMBEDDING_KEY || process.env.OPENAI_API_KEY;
-        const embeddings = new OpenAIEmbeddings({ model: EMBEDDING_MODEL, openAIApiKey: apiKey });
+        const embeddings = new OpenAIEmbeddings({
+            model: EMBEDDING_MODEL,
+            openAIApiKey: apiKey,
+            configuration: {
+                baseURL: "https://api.openai.com/v1",
+            },
+        });
 
         const results: ChunkEmbedding[] = [];
 

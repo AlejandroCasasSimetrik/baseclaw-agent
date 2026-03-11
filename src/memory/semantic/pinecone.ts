@@ -203,12 +203,16 @@ export async function deleteFromKnowledge(id: string): Promise<void> {
 export async function generateEmbedding(text: string): Promise<number[]> {
     const { OpenAIEmbeddings } = await import("@langchain/openai");
 
-    // Use OPENAI_EMBEDDING_KEY if available (separate from main OPENAI_API_KEY
-    // which may point to a non-OpenAI provider like Cerebras)
+    // Use OPENAI_EMBEDDING_KEY for real OpenAI embeddings.
+    // Must also override baseURL because OPENAI_BASE_URL is set to Cerebras
+    // (which doesn't support embeddings).
     const apiKey = process.env.OPENAI_EMBEDDING_KEY || process.env.OPENAI_API_KEY;
     const embeddings = new OpenAIEmbeddings({
         model: "text-embedding-3-small",
         openAIApiKey: apiKey,
+        configuration: {
+            baseURL: "https://api.openai.com/v1",
+        },
     });
     return embeddings.embedQuery(text);
 }

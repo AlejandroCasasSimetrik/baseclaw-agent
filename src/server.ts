@@ -174,6 +174,10 @@ app.post("/chat", async (req, res) => {
                 "X-Accel-Buffering": "no",
             });
 
+            // Increase socket timeout for long-running SSE (5 minutes)
+            req.socket.setTimeout(300_000);
+            res.socket?.setTimeout(300_000);
+
             // Flush helper — ensures data is sent to client immediately
             const sendSSE = (event: string, data: any) => {
                 res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
@@ -183,10 +187,21 @@ app.post("/chat", async (req, res) => {
                 }
             };
 
+            // Heartbeat — keep connection alive during long agent processing
+            const heartbeat = setInterval(() => {
+                try {
+                    res.write(`:ping\n\n`);
+                    if (typeof (res as any).flush === "function") {
+                        (res as any).flush();
+                    }
+                } catch { /* connection already closed */ }
+            }, 3_000);
+
             // Safety timeout — prevent infinite hang
             const timeout = setTimeout(() => {
                 console.error("[/chat SSE] Safety timeout reached (120s)");
                 sendSSE("error", { error: "Processing timeout" });
+                clearInterval(heartbeat);
                 decrementActiveInvocations();
                 res.end();
             }, 120_000);
@@ -333,6 +348,7 @@ app.post("/chat", async (req, res) => {
                 console.error("[/chat SSE] Stream error:", errMsg);
                 sendSSE("error", { error: errMsg });
             } finally {
+                clearInterval(heartbeat);
                 clearTimeout(timeout);
                 decrementActiveInvocations();
                 res.end();

@@ -20,10 +20,21 @@ export interface ChunkEmbedding {
 }
 
 /**
+ * Max tokens per embedding API request (OpenAI limit is 300,000).
+ * We use a safe margin to account for estimation inaccuracy.
+ */
+const MAX_TOKENS_PER_REQUEST = 280_000;
+
+/** Rough token estimate: ~4 characters per token for English text */
+function estimateTokens(text: string): number {
+    return Math.ceil(text.length / 4);
+}
+
+/**
  * Batch-embed an array of RAG chunks.
  *
- * Processes chunks in batches of EMBEDDING_BATCH_SIZE.
- * Returns an array of { chunkIndex, vector } tuples.
+ * Uses token-aware batching — estimates token count per chunk and
+ * creates sub-batches that stay under the OpenAI per-request limit.
  *
  * Traced as a LangSmith span.
  */
@@ -45,19 +56,38 @@ export const embedChunks = traceable(
 
         const results: ChunkEmbedding[] = [];
 
-        // Process in batches
-        for (let i = 0; i < chunks.length; i += EMBEDDING_BATCH_SIZE) {
-            const batch = chunks.slice(i, i + EMBEDDING_BATCH_SIZE);
+        // Build token-aware batches
+        let batchStart = 0;
+        while (batchStart < chunks.length) {
+            let batchEnd = batchStart;
+            let batchTokens = 0;
+
+            while (batchEnd < chunks.length) {
+                const chunkTokens = estimateTokens(chunks[batchEnd].text);
+                if (batchTokens + chunkTokens > MAX_TOKENS_PER_REQUEST && batchEnd > batchStart) {
+                    break; // This chunk would exceed the limit, start a new batch
+                }
+                batchTokens += chunkTokens;
+                batchEnd++;
+
+                // Also respect the configured batch size
+                if (batchEnd - batchStart >= EMBEDDING_BATCH_SIZE) break;
+            }
+
+            const batch = chunks.slice(batchStart, batchEnd);
             const texts = batch.map((c) => c.text);
 
+            console.log(`[RAG embed] Batch ${batchStart}..${batchEnd - 1} — ${batch.length} chunks, ~${batchTokens} tokens`);
             const vectors = await embeddings.embedDocuments(texts);
 
             for (let j = 0; j < batch.length; j++) {
                 results.push({
-                    chunkIndex: i + j,
+                    chunkIndex: batchStart + j,
                     vector: vectors[j],
                 });
             }
+
+            batchStart = batchEnd;
         }
 
         return results;

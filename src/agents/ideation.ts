@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { BaseClawStateType } from "../state.js";
 import { getPromptRegistry } from "../observability/prompts.js";
 import { withContext } from "./agent-middleware.js";
-import { extractTextContent } from "./content-utils.js";
+import { extractTextContent, filterMessagesForLLM } from "./content-utils.js";
 
 const DEFAULT_SYSTEM_PROMPT = `You are the Ideation Agent of Base Claw, a multi-agent system.
 
@@ -82,7 +82,7 @@ async function ideationAgentCore(
 
     const response = await getModel("ideation").invoke([
         new SystemMessage(mergeSystemPrompt(systemPrompt, contextMessages)),
-        ...state.messages,
+        ...filterMessagesForLLM(state.messages),
     ]);
 
     // Decide where to route — another specialist or reviewer

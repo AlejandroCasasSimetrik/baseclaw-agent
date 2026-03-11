@@ -5,7 +5,7 @@ import { z } from "zod";
 import type { BaseClawStateType } from "../state.js";
 import { getPromptRegistry } from "../observability/prompts.js";
 import { withContext } from "./agent-middleware.js";
-import { extractTextContent } from "./content-utils.js";
+import { extractTextContent, filterMessagesForLLM } from "./content-utils.js";
 import type {
     AudioInput,
     VoiceConfig,
@@ -172,7 +172,7 @@ async function conversationAgentCore(
         if (classification.intent === "conversation") {
             const response = await getModel("conversation").invoke([
                 new SystemMessage(mergeSystemPrompt(systemPrompt, contextMessages)),
-                ...state.messages,
+                ...filterMessagesForLLM(state.messages),
             ]);
 
             return new Command({

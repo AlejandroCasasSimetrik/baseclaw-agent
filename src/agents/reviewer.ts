@@ -262,8 +262,8 @@ async function _handleNeedsRevision(
         goto: sourceAgent,
         update: {
             messages: [
-                new SystemMessage(
-                    `[Reviewer] Your output needs revision. Score: ${assessment.overallScore}/100.\n\n${feedbackMessage}`
+                new HumanMessage(
+                    `[Reviewer Feedback] Your output needs revision. Score: ${assessment.overallScore}/100.\n\n${feedbackMessage}`
                 ),
             ],
             currentAgent: "reviewer",

@@ -42,6 +42,7 @@ function estimateTokens(text: string): number {
  */
 export const embedChunks = traceable(
     async (chunks: RAGChunk[]): Promise<ChunkEmbedding[]> => {
+        console.log(`[RAG embed] ████ TOKEN-AWARE BATCHING v2 ████ Received ${chunks.length} chunks, MAX_TOKENS=${MAX_TOKENS_PER_REQUEST}`);
         if (chunks.length === 0) return [];
 
         const { OpenAIEmbeddings } = await import("@langchain/openai");

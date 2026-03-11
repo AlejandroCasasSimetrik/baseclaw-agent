@@ -42,3 +42,21 @@ export function extractTextContent(content: unknown): string {
 
     return String(content);
 }
+
+/**
+ * Filter messages for LLM invocation.
+ *
+ * Anthropic requires system messages to be ONLY the first message.
+ * If state.messages contains SystemMessages (from reviewer feedback,
+ * middleware injection, etc.), they must be removed before sending
+ * to the LLM — the agent's own SystemMessage is prepended separately.
+ */
+export function filterMessagesForLLM(messages: any[]): any[] {
+    return messages.filter((msg) => {
+        if (typeof msg._getType === "function") {
+            return msg._getType() !== "system";
+        }
+        // Fallback: check constructor name
+        return msg.constructor?.name !== "SystemMessage";
+    });
+}

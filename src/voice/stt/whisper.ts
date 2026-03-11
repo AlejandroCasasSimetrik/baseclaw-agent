@@ -22,8 +22,12 @@ export class WhisperSTTProvider implements STTProvider {
         try {
             // Dynamic import to avoid constructor-time API key validation
             const { default: OpenAI } = await import("openai");
+            // Use OPENAI_EMBEDDING_KEY if available — it's a real OpenAI key.
+            // OPENAI_API_KEY points to Cerebras which doesn't support audio APIs.
+            const apiKey = process.env.OPENAI_EMBEDDING_KEY || process.env.OPENAI_API_KEY;
             const client = new OpenAI({
-                apiKey: process.env.OPENAI_API_KEY,
+                apiKey,
+                baseURL: "https://api.openai.com/v1",
             });
 
             // Create a File-like object from the buffer

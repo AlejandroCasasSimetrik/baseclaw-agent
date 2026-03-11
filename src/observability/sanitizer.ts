@@ -19,8 +19,8 @@ const PINECONE_KEY_PATTERN = /pcsk_[A-Za-z0-9_-]{10,}/g;
 /** LangSmith API keys: ls__... or lsv2_... */
 const LANGSMITH_KEY_PATTERN = /(?:ls__|lsv2_)[A-Za-z0-9_-]{10,}/g;
 
-/** ElevenLabs API keys */
-const ELEVENLABS_KEY_PATTERN = /(?:el_)[A-Za-z0-9_-]{20,}/g;
+/** ElevenLabs API keys (el_ or sk_ prefix) */
+const ELEVENLABS_KEY_PATTERN = /(?:el_|sk_)[A-Za-z0-9_-]{20,}/g;
 
 /** Deepgram API keys */
 const DEEPGRAM_KEY_PATTERN = /(?:dg_)[A-Za-z0-9_-]{20,}/g;

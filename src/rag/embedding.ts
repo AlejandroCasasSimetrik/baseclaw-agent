@@ -23,7 +23,7 @@ export interface ChunkEmbedding {
  * Max tokens per embedding API request (OpenAI limit is 300,000).
  * We use a safe margin to account for estimation inaccuracy.
  */
-const MAX_TOKENS_PER_REQUEST = 280_000;
+const MAX_TOKENS_PER_REQUEST = 200_000;
 
 /** Rough token estimate: ~4 characters per token for English text */
 function estimateTokens(text: string): number {
@@ -35,6 +35,8 @@ function estimateTokens(text: string): number {
  *
  * Uses token-aware batching — estimates token count per chunk and
  * creates sub-batches that stay under the OpenAI per-request limit.
+ * Sets LangChain's internal batchSize to match each sub-batch to
+ * prevent LangChain from re-batching and exceeding the token limit.
  *
  * Traced as a LangSmith span.
  */
@@ -46,13 +48,6 @@ export const embedChunks = traceable(
         // Use OPENAI_EMBEDDING_KEY for real OpenAI embeddings.
         // Must also override baseURL because OPENAI_BASE_URL is set to Cerebras.
         const apiKey = process.env.OPENAI_EMBEDDING_KEY || process.env.OPENAI_API_KEY;
-        const embeddings = new OpenAIEmbeddings({
-            model: EMBEDDING_MODEL,
-            openAIApiKey: apiKey,
-            configuration: {
-                baseURL: "https://api.openai.com/v1",
-            },
-        });
 
         const results: ChunkEmbedding[] = [];
 
@@ -76,6 +71,19 @@ export const embedChunks = traceable(
 
             const batch = chunks.slice(batchStart, batchEnd);
             const texts = batch.map((c) => c.text);
+
+            // CRITICAL: Set LangChain's internal batchSize to match our
+            // token-aware batch so it sends exactly ONE API call per batch.
+            // Without this, LangChain's default batchSize=512 would send
+            // all texts at once, potentially exceeding the 300k token limit.
+            const embeddings = new OpenAIEmbeddings({
+                model: EMBEDDING_MODEL,
+                openAIApiKey: apiKey,
+                batchSize: texts.length,
+                configuration: {
+                    baseURL: "https://api.openai.com/v1",
+                },
+            });
 
             console.log(`[RAG embed] Batch ${batchStart}..${batchEnd - 1} — ${batch.length} chunks, ~${batchTokens} tokens`);
             const vectors = await embeddings.embedDocuments(texts);

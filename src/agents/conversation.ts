@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { BaseClawStateType } from "../state.js";
 import { getPromptRegistry } from "../observability/prompts.js";
 import { withContext } from "./agent-middleware.js";
+import { extractTextContent } from "./content-utils.js";
 import type {
     AudioInput,
     VoiceConfig,
@@ -132,7 +133,7 @@ async function conversationAgentCore(
         for (let i = state.messages.length - 1; i >= 0; i--) {
             const msg = state.messages[i];
             if (msg._getType && msg._getType() === "ai") {
-                const c = typeof msg.content === "string" ? msg.content : String(msg.content);
+                const c = extractTextContent(msg.content);
                 if (!c.startsWith("[Reviewer]")) {
                     specialistResponse = msg;
                     break;
@@ -142,8 +143,7 @@ async function conversationAgentCore(
 
         // Use the specialist response or fall back to the last message
         const responseToDeliver = specialistResponse || lastMessage;
-        const responseContent = typeof responseToDeliver.content === "string"
-            ? responseToDeliver.content : String(responseToDeliver.content);
+        const responseContent = extractTextContent(responseToDeliver.content);
 
         return new Command({
             goto: "__end__",

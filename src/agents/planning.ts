@@ -5,6 +5,7 @@ import { z } from "zod";
 import type { BaseClawStateType } from "../state.js";
 import { getPromptRegistry } from "../observability/prompts.js";
 import { withContext } from "./agent-middleware.js";
+import { extractTextContent } from "./content-utils.js";
 
 const DEFAULT_SYSTEM_PROMPT = `You are the Planning Agent of Base Claw, a multi-agent system.
 
@@ -86,8 +87,7 @@ async function planningAgentCore(
     ]);
 
     // Decide where to route — another specialist or reviewer
-    const responseText = typeof response.content === "string"
-        ? response.content : String(response.content);
+    const responseText = extractTextContent(response.content);
     let nextAgent = "reviewer";
     try {
         const routingModel = getModel("conversation").withStructuredOutput(RoutingSchema);

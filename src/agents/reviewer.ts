@@ -4,6 +4,7 @@ import { AIMessage, SystemMessage } from "@langchain/core/messages";
 import type { BaseClawStateType } from "../state.js";
 import { getPromptRegistry } from "../observability/prompts.js";
 import { withContext } from "./agent-middleware.js";
+import { extractTextContent } from "./content-utils.js";
 import { scoreOutput } from "../reviewer-loop/quality-scorer.js";
 import { generateFeedback, formatFeedbackForAgent } from "../reviewer-loop/feedback-generator.js";
 import {
@@ -427,13 +428,13 @@ function _extractAgentOutput(state: BaseClawStateType): string | null {
     for (let i = messages.length - 1; i >= 0; i--) {
         const msg = messages[i];
         if (msg._getType && msg._getType() === "ai") {
-            return typeof msg.content === "string" ? msg.content : String(msg.content);
+            return extractTextContent(msg.content);
         }
         if (
             msg.constructor?.name === "AIMessage" ||
             msg.constructor?.name === "AIMessageChunk"
         ) {
-            return typeof msg.content === "string" ? msg.content : String(msg.content);
+            return extractTextContent(msg.content);
         }
     }
     return null;

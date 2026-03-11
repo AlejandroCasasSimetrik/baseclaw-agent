@@ -1,0 +1,54 @@
+{
+  "name": "baseclaw-agent",
+  "version": "0.1.0",
+  "description": "Base Claw — Reusable multi-agent architecture built on LangGraph.js",
+  "type": "module",
+  "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./src/*": "./src/*"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "dev:cli": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@deepgram/sdk": "^5.0.0",
+    "@langchain/anthropic": "^0.3.34",
+    "@langchain/core": "^0.3.0",
+    "@langchain/langgraph": "^0.2.0",
+    "@langchain/openai": "^0.3.0",
+    "@pinecone-database/pinecone": "^7.1.0",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/multer": "^2.1.0",
+    "@types/pg": "^8.18.0",
+    "@types/ws": "^8.18.1",
+    "cors": "^2.8.6",
+    "dotenv": "^16.4.0",
+    "drizzle-orm": "^0.45.1",
+    "elevenlabs": "^1.59.0",
+    "express": "^5.2.1",
+    "langsmith": "^0.2.0",
+    "llamaindex": "^0.8.0",
+    "multer": "^2.1.1",
+    "openai": "^4.104.0",
+    "pg": "^8.20.0",
+    "uuid": "^13.0.0",
+    "ws": "^8.19.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/uuid": "^10.0.0",
+    "drizzle-kit": "^0.31.9",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

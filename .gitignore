@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment secrets
+.env
+
+# OS files
+.DS_Store
+
+# Worktrees
+.worktrees/
+worktrees/
+
+# IDE
+.vscode/
+.idea/
+data/

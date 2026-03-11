@@ -1,0 +1,20 @@
+{
+    "servers": [
+        {
+            "id": "filesystem-local",
+            "name": "Local Filesystem MCP",
+            "url": "http://localhost:8080/mcp",
+            "transport": "sse",
+            "agentTypes": [
+                "execution",
+                "planning"
+            ],
+            "description": "Read and write files on the local filesystem",
+            "authConfig": {},
+            "destructiveTools": [
+                "write_file",
+                "delete_file"
+            ]
+        }
+    ]
+}

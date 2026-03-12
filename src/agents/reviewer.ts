@@ -122,7 +122,40 @@ async function reviewerAgentCore(
     // Extract the agent's output (most recent AI message)
     const agentOutput = _extractAgentOutput(state);
     if (!agentOutput) {
-        // No output to review — pass through to conversation
+        // No prior AI output to review — check if this is a direct review request
+        // from conversation agent (specialist mode)
+        const lastMsg = state.messages[state.messages.length - 1];
+        const isDirectRequest = lastMsg && lastMsg._getType && lastMsg._getType() === "human";
+
+        if (isDirectRequest) {
+            // Specialist mode: generate the review response ourselves
+            const rawPrompt = await getSystemPrompt();
+            const systemPrompt = rawPrompt.replace(
+                "{{taskContext}}",
+                state.taskContext || "No specific context provided"
+            );
+            const { filterMessagesForLLM } = await import("./content-utils.js");
+            const { mergeSystemPrompt } = await import("../models/factory.js");
+
+            const response = await getFactoryModel("reviewer").invoke([
+                new SystemMessage(mergeSystemPrompt(systemPrompt, contextMessages)),
+                ...filterMessagesForLLM(state.messages),
+            ]);
+
+            return new Command({
+                goto: "conversation",
+                update: {
+                    messages: [response],
+                    currentAgent: "reviewer",
+                    lastSpecialistAgent: "reviewer",
+                    phase: "review",
+                    reviewerGateState: defaultReviewerGateState(),
+                    iterationCount,
+                },
+            });
+        }
+
+        // No output and not a direct request — pass through to conversation
         return new Command({
             goto: "conversation",
             update: {

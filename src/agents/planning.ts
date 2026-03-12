@@ -1,11 +1,10 @@
 import { Command } from "@langchain/langgraph";
 import { getModel, mergeSystemPrompt } from "../models/factory.js";
-import { AIMessage, HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { z } from "zod";
+import { AIMessage, SystemMessage } from "@langchain/core/messages";
 import type { BaseClawStateType } from "../state.js";
 import { getPromptRegistry } from "../observability/prompts.js";
 import { withContext } from "./agent-middleware.js";
-import { extractTextContent, filterMessagesForLLM } from "./content-utils.js";
+import { filterMessagesForLLM } from "./content-utils.js";
 
 const DEFAULT_SYSTEM_PROMPT = `You are the Planning Agent of Base Claw, a multi-agent system.
 
@@ -38,22 +37,10 @@ async function getSystemPrompt(): Promise<string> {
     }
 }
 
-/** Routing schema — determines where to send the output next */
-const RoutingSchema = z.object({
-    nextAgent: z.enum(["reviewer", "ideation", "execution"]).describe(
-        "Where to send this output. Use 'execution' if the plan is complete and ready to implement. " +
-        "Use 'ideation' if more creative exploration is needed before finalizing. " +
-        "Use 'reviewer' for general quality review (default)."
-    ),
-    reason: z.string().describe("Brief reason for this routing choice"),
-});
-
 /**
  * Planning Agent Core — Plan creation and task decomposition.
  *
- * After generating its plan, this agent decides whether to hand off
- * to execution (plan ready to implement), ideation (needs more exploration),
- * or reviewer (default quality gate).
+ * After generating its plan, routes to reviewer for quality gating.
  */
 async function planningAgentCore(
     state: BaseClawStateType,
@@ -86,28 +73,10 @@ async function planningAgentCore(
         ...filterMessagesForLLM(state.messages),
     ]);
 
-    // Decide where to route — another specialist or reviewer
-    const responseText = extractTextContent(response.content);
-    let nextAgent = "reviewer";
-    try {
-        const routingModel = getModel("conversation").withStructuredOutput(RoutingSchema);
-        const routing = await routingModel.invoke([
-            new SystemMessage(
-                "You are a routing classifier. Based on the agent's plan output, decide where to send it next. " +
-                "If the plan is complete and actionable, send to 'execution' so it can be implemented. " +
-                "If the plan needs more creative exploration or brainstorming, send to 'ideation'. " +
-                "Otherwise send to 'reviewer' for quality review."
-            ),
-            new HumanMessage(`Agent output:\n\n${responseText.slice(0, 1500)}`),
-        ]);
-        nextAgent = routing.nextAgent;
-        console.log(`[Planning] Routing to ${nextAgent}: ${routing.reason}`);
-    } catch {
-        nextAgent = "reviewer";
-    }
-
+    // Always route to reviewer (quality gate) — cross-specialist routing
+    // is handled by the conversation agent's intent classification, not here.
     return new Command({
-        goto: nextAgent,
+        goto: "reviewer",
         update: {
             messages: [response],
             currentAgent: "planning",

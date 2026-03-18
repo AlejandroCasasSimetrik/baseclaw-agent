@@ -268,6 +268,47 @@ app.post("/chat", async (req, res) => {
                             } catch { }
                         }
 
+                        const currentAgent = stateUpdate?.currentAgent || node;
+                        const activeSkillIds = Array.isArray(stateUpdate?.activeSkills)
+                            ? stateUpdate.activeSkills
+                            : [];
+                        const activeSkillDetails = activeSkillIds.map((skillId: string) => {
+                            const skill = registry.getSkill(skillId);
+                            return {
+                                id: skillId,
+                                name: skill?.name || skillId,
+                                description: skill?.description || "",
+                                category: skill?.category || "builtin",
+                            };
+                        });
+
+                        let attachedMCPServerDetails: Array<Record<string, unknown>> = [];
+                        try {
+                            attachedMCPServerDetails = mcpRegistry
+                                .getServersForAgent(currentAgent as any)
+                                .map((server) => ({
+                                    id: server.id,
+                                    name: server.name,
+                                    description: server.description,
+                                    transport: server.transport,
+                                }));
+                        } catch {
+                            attachedMCPServerDetails = [];
+                        }
+
+                        const workingMemorySnapshot = snapshotWorkingMemory(
+                            workingMemoryStore.get(currentAgent) || null
+                        );
+
+                        serializedPayload.activeSkillDetails = activeSkillDetails;
+                        serializedPayload.attachedMCPServerDetails = attachedMCPServerDetails;
+                        if (!Array.isArray(serializedPayload.attachedMCPServers) || serializedPayload.attachedMCPServers.length === 0) {
+                            serializedPayload.attachedMCPServers = attachedMCPServerDetails.map((server) => server.name || server.id);
+                        }
+                        if (!serializedPayload.workingMemory && workingMemorySnapshot) {
+                            serializedPayload.workingMemory = workingMemorySnapshot;
+                        }
+
                         // Count skills and memories from the payload
                         const skillsLoaded = stateUpdate?.activeSkills?.length ?? 0;
                         const memoriesLoaded = stateUpdate?.memoriesLoaded ?? 0;
@@ -285,7 +326,7 @@ app.post("/chat", async (req, res) => {
 
                         sendSSE("node_start", {
                             node,
-                            agent: stateUpdate?.currentAgent || node,
+                            agent: currentAgent,
                             timestamp: Date.now() - startTime,
                             model: modelInfo,
                             skills: skillsLoaded,
@@ -803,6 +844,28 @@ const MAX_TOOL_CALLS = 20;
 
 /** Per-agent working memory snapshots — updated via SSE events or API */
 const workingMemoryStore = new Map<string, WorkingMemoryState | null>();
+
+function snapshotWorkingMemory(wm: WorkingMemoryState | null): Record<string, unknown> | null {
+    if (!wm) return null;
+
+    return {
+        taskId: wm.taskId,
+        taskDescription: wm.taskDescription,
+        currentGoal: wm.currentGoal,
+        activePlanSteps: wm.activePlanSteps.slice(-10),
+        recentToolResults: wm.recentToolResults.slice(-10),
+        mcpCallResults: wm.mcpCallResults.slice(-10),
+        ragResults: wm.ragResults.slice(-10),
+        interAgentMessages: wm.interAgentMessages.slice(-10),
+        loadedSkillDefinitions: wm.loadedSkillDefinitions.slice(-10),
+        createdAt: wm.createdAt,
+        tokenUsage: {
+            current: wm.currentTokenEstimate,
+            max: wm.maxTokenBudget,
+            percentage: Math.round((wm.currentTokenEstimate / wm.maxTokenBudget) * 100),
+        },
+    };
+}
 
 /** Per-agent semantic query log */
 interface SemanticQueryLogEntry {

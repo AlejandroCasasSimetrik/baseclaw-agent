@@ -4,6 +4,7 @@ import type { WorkingMemoryState } from "./memory/types.js";
 import type { VoiceInputState } from "./voice/types.js";
 import type { ReviewerGateState } from "./reviewer-loop/types.js";
 import { defaultReviewerGateState } from "./reviewer-loop/types.js";
+import type { TaskPlan } from "./tasks/types.js";
 
 /**
  * BaseClawState — Central state schema for the multi-agent system.
@@ -149,6 +150,17 @@ export const BaseClawState = Annotation.Root({
     reviewerGateState: Annotation<ReviewerGateState>({
         reducer: (_prev, next) => next,
         default: () => defaultReviewerGateState(),
+    }),
+
+    /**
+     * Active task plan — a structured plan composed of tasks from the registry.
+     * Created by the Planning Agent, consumed by the Execution Agent.
+     * Null when no plan is active.
+     * Added in Level 11 — Task System.
+     */
+    activePlan: Annotation<TaskPlan | null>({
+        reducer: (_prev, next) => next,
+        default: () => null,
     }),
 });
 

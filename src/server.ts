@@ -39,6 +39,7 @@ import {
     registerServersFromConfig,
 } from "./mcp/index.js";
 import { setSkillRegistry } from "./agents/agent-middleware.js";
+import { TaskRegistry, registerBuiltinTasks as registerBuiltinTasks_tasks } from "./tasks/index.js";
 import { setMCPRegistry } from "./agents/mcp-middleware.js";
 import { getDefaultVoiceConfig } from "./voice/config.js";
 import { processVoiceInput, generateVoiceResponse } from "./agents/conversation.js";
@@ -83,6 +84,13 @@ registerCustomSkill(registry, exampleSentimentSkill);
 setSkillRegistry(registry);
 console.log(
     `📦 Skill Registry loaded: ${registry.getAllSkills().length} skills registered`
+);
+
+// Task Registry
+const taskRegistry = new TaskRegistry();
+registerBuiltinTasks_tasks(taskRegistry);
+console.log(
+    `📋 Task Registry loaded: ${taskRegistry.size} tasks registered`
 );
 
 // MCP Server Registry
@@ -772,6 +780,75 @@ app.get("/api/skills/loaded/:agentType", (req, res) => {
         isBuiltIn: !skill.id.startsWith("custom."),
     }));
     res.json({ agentType, skills, count: skills.length });
+});
+
+// ── Tasks API ──────────────────────────────────────────────
+
+app.get("/api/tasks/registry", (_req, res) => {
+    const tasks = taskRegistry.getAllTasks().map((task) => ({
+        id: task.id,
+        name: task.name,
+        description: task.description,
+        agentTypes: task.agentTypes,
+        category: task.category || "general",
+        estimatedDuration: task.estimatedDuration || null,
+        requiredSkills: task.requiredSkills,
+        requiredTools: task.requiredTools,
+        isBuiltIn: !task.id.startsWith("custom."),
+        systemPromptPreview: task.systemPromptFragment.slice(0, 150) + (
+            task.systemPromptFragment.length > 150 ? "…" : ""
+        ),
+    }));
+    res.json({ tasks, count: tasks.length });
+});
+
+app.post("/api/tasks/custom", (req, res) => {
+    try {
+        const { id, name, description, agentTypes, requiredSkills, requiredTools, category, estimatedDuration, systemPromptFragment } = req.body;
+
+        if (!id || !name || !description) {
+            res.status(400).json({ error: "Missing required fields: id, name, description" });
+            return;
+        }
+
+        const taskId = id.startsWith("custom.") ? id : `custom.${id}`;
+
+        // Check if already registered
+        if (taskRegistry.getTask(taskId)) {
+            // Unregister then re-register (update)
+            taskRegistry.unregister(taskId);
+        }
+
+        taskRegistry.register({
+            id: taskId,
+            name,
+            description,
+            agentTypes: agentTypes || ["execution"],
+            requiredSkills: requiredSkills || [],
+            requiredTools: requiredTools || [],
+            category: category || "custom",
+            estimatedDuration: estimatedDuration || undefined,
+            systemPromptFragment: systemPromptFragment || `Execute the task: ${name}\n${description}`,
+            relevanceScorer: () => 0.5, // Custom tasks have neutral relevance
+        });
+
+        console.log(`📋 Custom task registered: ${taskId}`);
+        res.status(201).json({ id: taskId, name, registered: true });
+    } catch (error) {
+        const errMsg = error instanceof Error ? error.message : String(error);
+        res.status(500).json({ error: errMsg });
+    }
+});
+
+app.delete("/api/tasks/custom/:id", (req, res) => {
+    const taskId = req.params.id.startsWith("custom.") ? req.params.id : `custom.${req.params.id}`;
+    const removed = taskRegistry.unregister(taskId);
+    if (!removed) {
+        res.status(404).json({ error: `Task '${taskId}' not found or is built-in` });
+        return;
+    }
+    console.log(`📋 Custom task removed: ${taskId}`);
+    res.json({ removed: true, id: taskId });
 });
 
 // ── MCP API ────────────────────────────────────────────────

@@ -6,6 +6,24 @@ import type { ReviewerGateState } from "./reviewer-loop/types.js";
 import { defaultReviewerGateState } from "./reviewer-loop/types.js";
 import type { TaskPlan } from "./tasks/types.js";
 
+export interface CanvasWidgetOption {
+    label: string;
+    description?: string;
+}
+
+export interface CanvasWidgetQuestion {
+    question: string;
+    options: CanvasWidgetOption[];
+}
+
+export interface CanvasWidgetState {
+    type: "ideation-question" | "planning-tracker" | "reviewer-auth" | "reviewer-walkthrough";
+    title?: string;
+    description?: string;
+    questions?: CanvasWidgetQuestion[];
+    [key: string]: unknown;
+}
+
 /**
  * BaseClawState — Central state schema for the multi-agent system.
  *
@@ -159,6 +177,16 @@ export const BaseClawState = Annotation.Root({
      * Added in Level 11 — Task System.
      */
     activePlan: Annotation<TaskPlan | null>({
+        reducer: (_prev, next) => next,
+        default: () => null,
+    }),
+
+    /**
+     * Optional canvas widget payload emitted by the backend.
+     * Used by the console to render structured, interactive UI
+     * without reverse-engineering prose responses.
+     */
+    canvasWidget: Annotation<CanvasWidgetState | null>({
         reducer: (_prev, next) => next,
         default: () => null,
     }),

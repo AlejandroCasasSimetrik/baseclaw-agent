@@ -217,6 +217,7 @@ app.post("/chat", async (req, res) => {
             try {
                 let lastSpecialist = "conversation";
                 let finalResponse = "[No response]";
+                let finalCanvasWidget: any = null;
 
                 console.log("[/chat SSE] Starting graph.stream()...");
 
@@ -256,6 +257,10 @@ app.post("/chat", async (req, res) => {
                             }
                         } catch {
                             serializedPayload = { _serializationError: true };
+                        }
+
+                        if (Object.prototype.hasOwnProperty.call(stateUpdate || {}, "canvasWidget")) {
+                            finalCanvasWidget = stateUpdate.canvasWidget ?? null;
                         }
 
                         // Emit node transition event with full payload
@@ -368,6 +373,9 @@ app.post("/chat", async (req, res) => {
                                     finalResponse = txt;
                                     console.log(`[/chat SSE] Captured response from ${node} (${txt.length} chars)`);
                                 }
+                                if (Object.prototype.hasOwnProperty.call(lastAi?.additional_kwargs || {}, "canvasWidget")) {
+                                    finalCanvasWidget = lastAi.additional_kwargs.canvasWidget ?? null;
+                                }
                             } else {
                                 // Fallback: any message with content
                                 const anyMsg = [...msgs].reverse().find((m: any) => m.content);
@@ -391,6 +399,7 @@ app.post("/chat", async (req, res) => {
                     tenantId,
                     durationMs: Date.now() - startTime,
                     agent: lastSpecialist,
+                    widget: finalCanvasWidget,
                 });
             } catch (error) {
                 const errMsg = error instanceof Error ? error.message : String(error);
@@ -419,12 +428,14 @@ app.post("/chat", async (req, res) => {
                     .find((m: any) => m._getType() === "ai");
 
                 const response = lastAiMessage?.content?.toString() || "[No response]";
+                const widget = lastAiMessage?.additional_kwargs?.canvasWidget ?? result.canvasWidget ?? null;
 
                 res.json({
                     response,
                     tenantId,
                     durationMs: Date.now() - startTime,
                     agent: result.lastSpecialistAgent || result.currentAgent || "conversation",
+                    widget,
                 });
             } finally {
                 decrementActiveInvocations();

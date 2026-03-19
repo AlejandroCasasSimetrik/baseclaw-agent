@@ -186,33 +186,59 @@ app.post("/chat", async (req, res) => {
             req.socket.setTimeout(300_000);
             res.socket?.setTimeout(300_000);
 
+            let clientClosed = false;
+            const closeConnection = () => {
+                if (clientClosed) return;
+                clientClosed = true;
+                clearInterval(heartbeat);
+                clearTimeout(timeout);
+            };
+
             // Flush helper — ensures data is sent to client immediately
             const sendSSE = (event: string, data: any) => {
-                res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
-                // Force flush if available (Express may buffer)
-                if (typeof (res as any).flush === "function") {
-                    (res as any).flush();
+                if (clientClosed || res.writableEnded || res.destroyed) {
+                    return false;
+                }
+
+                try {
+                    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+                    // Force flush if available (Express may buffer)
+                    if (typeof (res as any).flush === "function") {
+                        (res as any).flush();
+                    }
+                    return true;
+                } catch {
+                    closeConnection();
+                    return false;
                 }
             };
 
             // Heartbeat — keep connection alive during long agent processing
             const heartbeat = setInterval(() => {
+                if (clientClosed || res.writableEnded || res.destroyed) return;
                 try {
                     res.write(`:ping\n\n`);
                     if (typeof (res as any).flush === "function") {
                         (res as any).flush();
                     }
-                } catch { /* connection already closed */ }
+                } catch {
+                    closeConnection();
+                }
             }, 3_000);
 
             // Safety timeout — prevent infinite hang
             const timeout = setTimeout(() => {
+                if (clientClosed) return;
                 console.error("[/chat SSE] Safety timeout reached (120s)");
                 sendSSE("error", { error: "Processing timeout" });
-                clearInterval(heartbeat);
-                decrementActiveInvocations();
-                res.end();
+                closeConnection();
+                if (!res.writableEnded) {
+                    res.end();
+                }
             }, 120_000);
+
+            res.on("close", closeConnection);
+            req.on("aborted", closeConnection);
 
             try {
                 let lastSpecialist = "conversation";
@@ -229,9 +255,26 @@ app.post("/chat", async (req, res) => {
                     { recursionLimit: 50, streamMode: "updates" }
                 );
 
+                const cancelStream = async () => {
+                    try {
+                        if (typeof (stream as any)?.return === "function") {
+                            await (stream as any).return();
+                        }
+                    } catch {
+                        // Ignore cancellation cleanup errors
+                    }
+                };
+
                 for await (const chunk of stream) {
+                    if (clientClosed) {
+                        await cancelStream();
+                        break;
+                    }
+
                     // chunk is { nodeName: stateUpdate }
                     for (const [node, update] of Object.entries(chunk)) {
+                        if (clientClosed) break;
+
                         const stateUpdate = update as any;
 
                         console.log(`[/chat SSE] Node: ${node}, agent: ${stateUpdate?.currentAgent || node}`);
@@ -337,7 +380,7 @@ app.post("/chat", async (req, res) => {
                             reviewer: "Scoring quality & reviewing output",
                         };
 
-                        sendSSE("node_start", {
+                        const delivered = sendSSE("node_start", {
                             node,
                             agent: currentAgent,
                             timestamp: Date.now() - startTime,
@@ -349,6 +392,10 @@ app.post("/chat", async (req, res) => {
                             description: stepDescriptions[node] || `Processing in ${node}`,
                             payload: serializedPayload,
                         });
+                        if (!delivered) {
+                            await cancelStream();
+                            break;
+                        }
 
                         // Track the specialist agent
                         if (stateUpdate?.lastSpecialistAgent && stateUpdate.lastSpecialistAgent !== "conversation") {
@@ -391,6 +438,10 @@ app.post("/chat", async (req, res) => {
                     }
                 }
 
+                if (clientClosed) {
+                    return;
+                }
+
                 console.log(`[/chat SSE] Stream complete. Specialist: ${lastSpecialist}`);
 
                 // Send final complete response
@@ -404,12 +455,17 @@ app.post("/chat", async (req, res) => {
             } catch (error) {
                 const errMsg = error instanceof Error ? error.message : String(error);
                 console.error("[/chat SSE] Stream error:", errMsg);
-                sendSSE("error", { error: errMsg });
+                if (!clientClosed) {
+                    sendSSE("error", { error: errMsg });
+                }
             } finally {
-                clearInterval(heartbeat);
-                clearTimeout(timeout);
+                res.off("close", closeConnection);
+                req.off("aborted", closeConnection);
+                closeConnection();
                 decrementActiveInvocations();
-                res.end();
+                if (!res.writableEnded) {
+                    res.end();
+                }
             }
         } else {
             // ── Classic JSON Mode (backwards-compatible) ──

@@ -1,6 +1,6 @@
 import { Command } from "@langchain/langgraph";
 import { getModel, mergeSystemPrompt } from "../models/factory.js";
-import { AIMessage, SystemMessage } from "@langchain/core/messages";
+import { AIMessage, HumanMessage, SystemMessage } from "@langchain/core/messages";
 import { z } from "zod";
 import type { BaseClawStateType } from "../state.js";
 import type { CanvasWidgetState } from "../state.js";
@@ -38,6 +38,17 @@ const IDEATION_WIDGET_INSTRUCTIONS = `Structured response contract:
 - Every answer choice must directly answer its question. Do not recycle choices from a different question.
 - Do not rely on canned domain examples. The questionnaire must be grounded in the user's current topic.
 - Use canvasWidget = null when a questionnaire is not needed.`;
+
+const IDEATION_WIDGET_RECOVERY_INSTRUCTIONS = `You are repairing a missing ideation questionnaire for the canvas UI.
+
+Return a questionnaire that the user can answer one question at a time.
+- Base every question and answer choice on the actual conversation context.
+- Every answer choice must directly answer its question.
+- Keep the questionnaire concise and practical.
+- Use 1-6 questions.
+- Use 2-5 answer choices per question.
+- Do not use domain-specific canned templates.
+- If the user explicitly asked to be asked questions, or the draft response already contains multiple questions, you must return a non-null questionnaire.`;
 
 const IdeationWidgetOptionSchema = z.object({
     label: z.string().min(1).describe("The user-facing answer label"),
@@ -81,7 +92,31 @@ function looksQuestionLike(text: string): boolean {
     return text.includes("?") || /^(what|which|who|when|where|why|how)\b/i.test(text);
 }
 
-function sanitizeCanvasWidget(widget: IdeationStructuredResponse["canvasWidget"]): CanvasWidgetState | null {
+function countQuestions(text: string): number {
+    return (text.match(/\?/g) || []).length;
+}
+
+function getLatestHumanMessageText(state: BaseClawStateType): string {
+    for (let i = state.messages.length - 1; i >= 0; i -= 1) {
+        const message = state.messages[i];
+        if (message?._getType?.() === "human") {
+            return normalizeWidgetText(message.content?.toString?.() || "");
+        }
+    }
+    return "";
+}
+
+function shouldRecoverCanvasWidget(state: BaseClawStateType, responseText: string): boolean {
+    const latestUserText = getLatestHumanMessageText(state);
+    if (/\b(question|questions|questionnaire|ask me|ask some|clarify|help me decide)\b/i.test(latestUserText)) {
+        return true;
+    }
+    return countQuestions(responseText) >= 2;
+}
+
+function sanitizeCanvasWidget(
+    widget: IdeationStructuredResponse["canvasWidget"] | z.infer<typeof IdeationCanvasWidgetSchema> | null
+): CanvasWidgetState | null {
     if (!widget) return null;
 
     const questions = (widget.questions || [])
@@ -130,6 +165,36 @@ async function getSystemPrompt(): Promise<string> {
     }
 }
 
+async function recoverCanvasWidget(
+    state: BaseClawStateType,
+    contextMessages: SystemMessage[],
+    systemPrompt: string,
+    responseText: string
+): Promise<CanvasWidgetState | null> {
+    const latestUserText = getLatestHumanMessageText(state);
+    const recoveryModel = getModel("ideation").withStructuredOutput(IdeationCanvasWidgetSchema);
+    const recoveredWidget = await recoveryModel.invoke([
+        new SystemMessage(
+            mergeSystemPrompt(
+                `${systemPrompt}\n\n${IDEATION_WIDGET_RECOVERY_INSTRUCTIONS}`,
+                contextMessages
+            )
+        ),
+        new HumanMessage(
+            [
+                "Current user request:",
+                latestUserText || "[No user request found]",
+                "",
+                "Draft ideation response:",
+                responseText || "[No draft response found]",
+                "",
+                "Return only the questionnaire structure for the canvas UI.",
+            ].join("\n")
+        ),
+    ]);
+    return sanitizeCanvasWidget(recoveredWidget as z.infer<typeof IdeationCanvasWidgetSchema>);
+}
+
 /**
  * Ideation Agent Core — Brainstorming and creative exploration.
  *
@@ -166,9 +231,16 @@ async function ideationAgentCore(
         new SystemMessage(mergeSystemPrompt(`${systemPrompt}\n\n${IDEATION_WIDGET_INSTRUCTIONS}`, contextMessages)),
         ...filterMessagesForLLM(state.messages),
     ]);
-    const widget = sanitizeCanvasWidget(structuredResponse.canvasWidget);
+    let widget = sanitizeCanvasWidget(structuredResponse.canvasWidget);
     const responseText = normalizeWidgetText(structuredResponse.responseText)
         || (widget ? "I have a few focused questions that will help me guide the next step." : "Let's explore a few directions.");
+    if (!widget && shouldRecoverCanvasWidget(state, responseText)) {
+        try {
+            widget = await recoverCanvasWidget(state, contextMessages, systemPrompt, responseText);
+        } catch {
+            widget = null;
+        }
+    }
     const response = new AIMessage({
         content: responseText,
         additional_kwargs: widget ? { canvasWidget: widget } : {},

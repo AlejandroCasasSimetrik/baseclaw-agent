@@ -1,15 +1,15 @@
 import type { TaskDefinition } from "../types.js";
 
 /**
- * Built-in execution tasks.
- * Available to the execution agent for implementation work.
+ * Built-in execution tasks — top-level grouped tasks.
+ * Each task represents a broad capability, not a granular step.
  */
 export const executionTasks: TaskDefinition[] = [
     {
-        id: "execution.implement-feature",
-        name: "Implement Feature",
+        id: "execution.build",
+        name: "Build & Implement",
         description:
-            "Implement a specific feature or component based on requirements. Writes code, creates files, and wires up integrations.",
+            "Implement features, write code, create integrations, and handle the full development lifecycle — including writing tests, refactoring, and API integrations.",
         agentTypes: ["execution"],
         requiredSkills: ["execution.code-generation"],
         requiredTools: ["code_expert"],
@@ -18,121 +18,26 @@ export const executionTasks: TaskDefinition[] = [
         systemPromptFragment: `When executing this task:
 - Follow existing code patterns and conventions
 - Write clean, documented code
-- Create or update tests alongside the implementation
-- Handle error cases explicitly
+- Create or update tests alongside implementation
+- Handle error cases and edge cases explicitly
+- Wire up integrations and map request/response schemas
+- Refactor for quality when needed without changing behavior
 - Log key operations for observability`,
         relevanceScorer: (_agentType, taskContext) => {
             const keywords = [
-                "implement",
-                "build",
-                "create",
-                "code",
-                "feature",
-                "develop",
-                "write",
+                "implement", "build", "create", "code", "feature", "develop",
+                "write", "test", "integrate", "api", "refactor", "endpoint",
             ];
             const lower = taskContext.toLowerCase();
             const matches = keywords.filter((k) => lower.includes(k)).length;
-            return Math.min(0.3 + matches * 0.15, 1.0);
-        },
-    },
-    {
-        id: "execution.write-tests",
-        name: "Write Tests",
-        description:
-            "Create unit tests, integration tests, or end-to-end tests for existing code. Covers happy paths, edge cases, and error scenarios.",
-        agentTypes: ["execution"],
-        requiredSkills: ["execution.code-generation"],
-        requiredTools: ["code_expert"],
-        estimatedDuration: "20m",
-        category: "development",
-        systemPromptFragment: `When executing this task:
-- Cover happy path, edge cases, and error cases
-- Use existing test patterns and frameworks
-- Mock external dependencies appropriately
-- Aim for meaningful coverage, not just line count
-- Name tests descriptively — what behavior is being tested`,
-        relevanceScorer: (_agentType, taskContext) => {
-            const keywords = [
-                "test",
-                "spec",
-                "coverage",
-                "assert",
-                "verify",
-                "validate",
-                "unit",
-            ];
-            const lower = taskContext.toLowerCase();
-            const matches = keywords.filter((k) => lower.includes(k)).length;
-            return Math.min(0.2 + matches * 0.15, 1.0);
-        },
-    },
-    {
-        id: "execution.api-integration",
-        name: "API Integration",
-        description:
-            "Integrate with an external API. Handles authentication, request/response mapping, error handling, and rate limiting.",
-        agentTypes: ["execution"],
-        requiredSkills: [],
-        requiredTools: ["http_request"],
-        estimatedDuration: "20m",
-        category: "integration",
-        systemPromptFragment: `When executing this task:
-- Set up authentication (API keys, OAuth, etc.)
-- Map request/response schemas
-- Handle HTTP errors and retries gracefully
-- Implement rate limiting if needed
-- Add logging for request/response debugging`,
-        relevanceScorer: (_agentType, taskContext) => {
-            const keywords = [
-                "api",
-                "integrate",
-                "endpoint",
-                "http",
-                "rest",
-                "webhook",
-                "external",
-            ];
-            const lower = taskContext.toLowerCase();
-            const matches = keywords.filter((k) => lower.includes(k)).length;
-            return Math.min(0.2 + matches * 0.15, 1.0);
-        },
-    },
-    {
-        id: "execution.refactor",
-        name: "Refactor Code",
-        description:
-            "Refactor existing code to improve quality without changing behavior. Focuses on readability, performance, or structure.",
-        agentTypes: ["execution"],
-        requiredSkills: ["execution.code-generation"],
-        requiredTools: ["code_expert"],
-        estimatedDuration: "20m",
-        category: "development",
-        systemPromptFragment: `When executing this task:
-- Preserve existing behavior — no functional changes
-- Improve naming, structure, or performance
-- Ensure tests still pass after refactoring
-- Document the rationale for structural changes`,
-        relevanceScorer: (_agentType, taskContext) => {
-            const keywords = [
-                "refactor",
-                "clean",
-                "reorganize",
-                "simplify",
-                "restructure",
-                "improve",
-                "debt",
-            ];
-            const lower = taskContext.toLowerCase();
-            const matches = keywords.filter((k) => lower.includes(k)).length;
-            return Math.min(0.2 + matches * 0.15, 1.0);
+            return Math.min(0.3 + matches * 0.1, 1.0);
         },
     },
     {
         id: "execution.deploy",
-        name: "Deploy Service",
+        name: "Deploy & Ship",
         description:
-            "Deploy a service or application to a target environment. Handles build, configuration, and verification.",
+            "Deploy services and applications to target environments — build, configure, verify, and run post-deployment checks.",
         agentTypes: ["execution"],
         requiredSkills: [],
         requiredTools: [],
@@ -146,17 +51,12 @@ export const executionTasks: TaskDefinition[] = [
 - Document the deployment (version, timestamp, environment)`,
         relevanceScorer: (_agentType, taskContext) => {
             const keywords = [
-                "deploy",
-                "release",
-                "ship",
-                "production",
-                "staging",
-                "publish",
-                "launch",
+                "deploy", "release", "ship", "production", "staging",
+                "publish", "launch", "environment",
             ];
             const lower = taskContext.toLowerCase();
             const matches = keywords.filter((k) => lower.includes(k)).length;
-            return Math.min(0.2 + matches * 0.15, 1.0);
+            return Math.min(0.2 + matches * 0.12, 1.0);
         },
     },
 ];

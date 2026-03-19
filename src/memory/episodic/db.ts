@@ -14,6 +14,21 @@ const { Pool } = pg;
 let _db: ReturnType<typeof drizzle> | null = null;
 let _pool: InstanceType<typeof Pool> | null = null;
 
+function createPool(connectionString: string): InstanceType<typeof Pool> {
+    const pool = new Pool({ connectionString });
+
+    // `pg` emits pool-level errors for idle clients. If we don't handle them,
+    // a transient database reset can crash the whole agent process.
+    pool.on("error", (error) => {
+        console.error(
+            "[EpisodicMemory] PostgreSQL pool error. Existing requests may fail, but the server will stay up.",
+            error
+        );
+    });
+
+    return pool;
+}
+
 /**
  * Get or create the Drizzle database instance.
  * Requires DATABASE_URL environment variable.
@@ -30,7 +45,7 @@ export function getDb() {
                 "Add it to your .env file."
             );
         }
-        _pool = new Pool({ connectionString: databaseUrl });
+        _pool = createPool(databaseUrl);
         _db = drizzle(_pool, { schema });
     }
     return _db;

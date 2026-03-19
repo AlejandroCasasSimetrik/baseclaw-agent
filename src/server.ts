@@ -205,14 +205,14 @@ app.post("/chat", async (req, res) => {
                 } catch { /* connection already closed */ }
             }, 3_000);
 
-            // Safety timeout — prevent infinite hang
+            // Safety timeout — prevent infinite hang (matches socket timeout)
             const timeout = setTimeout(() => {
-                console.error("[/chat SSE] Safety timeout reached (120s)");
+                console.error("[/chat SSE] Safety timeout reached (300s)");
                 sendSSE("error", { error: "Processing timeout" });
                 clearInterval(heartbeat);
                 decrementActiveInvocations();
                 res.end();
-            }, 120_000);
+            }, 300_000);
 
             try {
                 let lastSpecialist = "conversation";

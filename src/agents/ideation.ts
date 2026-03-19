@@ -49,7 +49,6 @@ Return a questionnaire that the user can answer one question at a time.
 - Use 2-5 answer choices per question.
 - Do not use domain-specific canned templates.
 - If the user explicitly asked to be asked questions, or the draft response already contains multiple questions, you must return a non-null questionnaire.`;
-
 const IdeationWidgetOptionSchema = z.object({
     label: z.string().min(1).describe("The user-facing answer label"),
     description: z.string().optional().default("").describe("Optional clarifying detail for this answer"),

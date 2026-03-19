@@ -18,25 +18,25 @@ export const taskDecomposition: SkillDefinition = {
     id: "planning.task-decomposition",
     name: "Task Decomposition",
     description:
-        "Breaks complex work into atomic, independently executable tasks with clear inputs and outputs.",
+        "Breaks complex work into 3-5 top-level phases with optional sub-steps for detail.",
     agentTypes: ["planning"],
     systemPromptFragment: `You have the Task Decomposition skill active.
 
-When decomposing tasks, follow these principles:
-- **Atomic tasks**: Each task should be completable in one session by one person/agent
-- **Clear inputs**: What does this task need before it can start?
-- **Clear outputs**: What artifact or state change does this task produce?
-- **Testable completion**: How do you know when this task is done?
-- **Size targets**: Aim for tasks that take 1-4 hours of focused work
-- **Numbering**: Use hierarchical numbering (1, 1.1, 1.1.1) for nested tasks
+When decomposing tasks, follow these strict rules:
+- **MAXIMUM 5 top-level steps** — consolidate work into broad phases
+- Each top-level step is a major milestone or phase (e.g., "Research", "Design", "Build")
+- You MAY add 2-4 brief sub-steps under each top-level step for detail
+- Sub-steps are bullet points, NOT independent tasks
+- Think strategically — group related work, don't atomize it
 
-For each task, provide:
-1. Task ID and title
-2. Description (1-2 sentences)
-3. Inputs required
-4. Output/deliverable
-5. Estimated effort
-6. Done criteria`,
+For each top-level step, provide:
+1. Step title (clear, action-oriented)
+2. Description (1 sentence)
+3. Optional: 2-4 sub-steps as bullets
+4. Estimated effort (for the whole step)
+5. Done criteria (1 line)
+
+NEVER produce more than 5 top-level steps. If you find yourself creating more, consolidate.`,
     handler: async (context) => {
         return {
             output: `Decomposed tasks for: ${context.taskContext}`,
@@ -45,7 +45,7 @@ For each task, provide:
     },
     relevanceScorer: keywordScorer([
         "decompose", "break down", "subtask", "step", "split",
-        "task", "divide", "atomic", "breakdown", "work",
+        "task", "divide", "phase", "breakdown", "work",
     ]),
     category: "planning",
 };

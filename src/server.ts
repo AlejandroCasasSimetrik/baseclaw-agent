@@ -226,16 +226,16 @@ app.post("/chat", async (req, res) => {
                 }
             }, 3_000);
 
-            // Safety timeout — prevent infinite hang
+            // Safety timeout — prevent infinite hang (matches socket timeout)
             const timeout = setTimeout(() => {
                 if (clientClosed) return;
-                console.error("[/chat SSE] Safety timeout reached (120s)");
+                console.error("[/chat SSE] Safety timeout reached (300s)");
                 sendSSE("error", { error: "Processing timeout" });
                 closeConnection();
                 if (!res.writableEnded) {
                     res.end();
                 }
-            }, 120_000);
+            }, 300_000);
 
             res.on("close", closeConnection);
             req.on("aborted", closeConnection);
